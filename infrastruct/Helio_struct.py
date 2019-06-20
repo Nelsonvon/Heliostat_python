@@ -3,6 +3,7 @@ import math as m
 import numpy as np
 import numpy.linalg as LA
 import matplotlib.pyplot as plt
+import pickle
 
 CABLE_ID = int
 HELIO_ID = int
@@ -153,8 +154,13 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
                 self.helio_dict[max(self.helio_dict.keys())+1]= new_hs
         return
 
-    def save_solution(self):
-        pass
+    def save_solution(self, save_file: str):
+        cables = []
+        for h1, h2 in self.cable_dict.values():
+            cables.append([h1, h2])
+        with open(save_file, 'wb') as fout:
+            pickle.dump(cables,fout,pickle.HIGHEST_PROTOCOL)
+        return
 
     def visualise(self):
         x = [h.pos.x for h in self.helio_dict.values()]
@@ -167,12 +173,21 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
             y_list = [pos1.y, pos2.y]
             plt.plot(x_list, y_list,c='g')
         plt.scatter(x,y,s=20 ,c='b')
+
+        for xy in zip(x,y):
+            plt.annotate('(%s, %s)' %xy, xy=xy)
         plt.scatter([0], [0], [50], c='r')
         plt.show()
         pass
 
-    def load_solution(self):
-        pass
+    def load_solution(self, load_file:str):
+        with open(load_file,'rb') as fin:
+            cables = pickle.load(fin)
+        for pair in cables:
+            h1 = pair[0]
+            h2 = pair[1]
+            self.connect_hs(h1,h2)
+        return
 
     def cal_cost(self)->float:
         pass
@@ -364,11 +379,11 @@ def EW_algo():
             j = find_cloest(i)
             g_i = helio.distance(i,helio.center_id)
             c_ij = helio.distance(i,j)
-            if g_i - c_ij > t_max:
+            if g_i - c_ij > t_max and ((helio.helio_dict[i].size_subtree + helio.helio_dict[j].size_subtree<= MAX_LENGTH)):
                 t_max = g_i - c_ij
                 k = i
                 k_j = j
-        if (helio.helio_dict[k].size_subtree + helio.helio_dict[k_j].size_subtree<= MAX_LENGTH):
+        if k!= -1 and k_j != -1:
             have_change = True
             helio.disconnect_hs(k, helio.center_id)
             helio.connect_hs(k_j,k)

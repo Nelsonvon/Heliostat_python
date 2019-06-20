@@ -9,7 +9,7 @@ HELIO_ID = int
 MAX_BRANCH = 16
 MAX_LENGTH = 128
 
-filename = '/home/nelson/Dropbox/RWTH/Heuristic optimisation/Project/positions-PS10.csv'
+filename = 'positions-PS10.csv'
 
 class POS:
     x:float
@@ -283,8 +283,22 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
             self.helio_dict[self.helio_dict[h].parent] = -1
             return True
 
+    def is_different_subtree(self, h1: HELIO_ID, h2: HELIO_ID)-> bool:
+        # get the root of the subtrees and compare
+        cur_h = h1
+        while (self.helio_dict[cur_h].parent!= self.center_id and self.helio_dict[cur_h].parent != -1):
+            cur_h = self.helio_dict[cur_h].parent
+        h1_root = cur_h
+        cur_h = h2
+        while (self.helio_dict[cur_h].parent != self.center_id and self.helio_dict[cur_h].parent != -1):
+            cur_h = self.helio_dict[cur_h].parent
+        h2_root = cur_h
+        if h1_root == h2_root:
+            return False
+        else:
+            return True
 
-helio = Helio_struct()
+# helio = Helio_struct()
 # for i in helio.helio_dict:
 #     if i >0:
 #         helio.connect_hs(i-1,i)
@@ -293,30 +307,77 @@ helio = Helio_struct()
 # print(helio.is_overdeg())
 # print(helio.is_overlength())
 # print(helio.is_st())
-while not helio.is_st():
-    print("new epoch")
-    for h_id,h in zip(helio.helio_dict.keys(),helio.helio_dict.values()):
-        if h_id != helio.center_id and h.parent == -1: # don't handle center
-            min_dist = 10000
-            parent_id = -1
-            for id in helio.helio_dict:
-                dist = helio.distance(h_id, id)
-                if dist<min_dist and (helio.helio_dict[id].parent != -1 or id == helio.center_id):
-                    new_c = CABLE(h_id, id)
-                    print("id:{},h_id:{}".format(str(id),str(h_id)))
-                    if len(helio.is_overlap_c(new_c))==0:
-                        min_dist = dist
-                        parent_id = id
-            if min_dist < 10000:
-                helio.connect_hs(parent_id,h_id)
-                # #print("id:{}, id parent:{}, h_id:{}, h_id parent:{}".format(str(parent_id),str(helio.helio_dict[parent_id].parent),
-                #                                                             str(h_id), str(helio.helio_dict[h_id].parent)))
-            else:
-                print("can't find suitable parent")
-                print("h_id:{}, h_id parent:{}".format(str(h_id),str(helio.helio_dict[h_id].parent)))
+# while not helio.is_st():
+#     print("new epoch")
+#     for h_id,h in zip(helio.helio_dict.keys(),helio.helio_dict.values()):
+#         if h_id != helio.center_id and h.parent == -1: # don't handle center
+#             min_dist = 10000
+#             parent_id = -1
+#             for id in helio.helio_dict:
+#                 dist = helio.distance(h_id, id)
+#                 if dist<min_dist and (helio.helio_dict[id].parent != -1 or id == helio.center_id):
+#                     new_c = CABLE(h_id, id)
+#                     print("id:{},h_id:{}".format(str(id),str(h_id)))
+#                     if len(helio.is_overlap_c(new_c))==0:
+#                         min_dist = dist
+#                         parent_id = id
+#             if min_dist < 10000:
+#                 helio.connect_hs(parent_id,h_id)
+#                 # #print("id:{}, id parent:{}, h_id:{}, h_id parent:{}".format(str(parent_id),str(helio.helio_dict[parent_id].parent),
+#                 #                                                             str(h_id), str(helio.helio_dict[h_id].parent)))
+#             else:
+#                 pass
+#                 # print("can't find suitable parent")
+#                 # print("h_id:{}, h_id parent:{}".format(str(h_id),str(helio.helio_dict[h_id].parent)))
 
-helio.visualise()
+def EW_algo():
+    # connnect to the center
+    gates: List= []
+    helio = Helio_struct()
+    for i in helio.helio_dict.keys():
+        if i != helio.center_id:
+            helio.connect_hs(helio.center_id, i)
+            gates.append(i)
+    helio.visualise()
 
+    #algo
+    have_change = True
+    epoch = 0
+    while have_change and epoch<=50:
+        have_change = False
+        t_max= 0
+        k = -1
+        k_j = -1
+
+        # get t_max
+        for i in gates:
+            def find_cloest(i: HELIO_ID)->HELIO_ID:
+                min_j = -1
+                min_distance = 10000
+                for j in helio.helio_dict.keys():
+                    if j != helio.center_id and j!= i and helio.is_different_subtree(i,j):
+                        if helio.distance(i,j)<min_distance:
+                            min_distance = helio.distance(i,j)
+                            min_j = j
+                return min_j
+
+            j = find_cloest(i)
+            g_i = helio.distance(i,helio.center_id)
+            c_ij = helio.distance(i,j)
+            if g_i - c_ij > t_max:
+                t_max = g_i - c_ij
+                k = i
+                k_j = j
+        if (helio.helio_dict[k].size_subtree + helio.helio_dict[k_j].size_subtree<= MAX_LENGTH):
+            have_change = True
+            helio.disconnect_hs(k, helio.center_id)
+            helio.connect_hs(k_j,k)
+            gates.remove(k)
+        epoch +=1
+        print("finish epoch {}".format(str(epoch)))
+    helio.visualise()
+
+EW_algo()
 
 
 

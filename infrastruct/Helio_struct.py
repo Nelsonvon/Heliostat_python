@@ -98,7 +98,8 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
         if equal(A,C) or equal(A,D) or equal(B,C) or equal(B,D):
             return False
         else:
-            if(m.sin(LA.norm(AC*AD))*m.sin(LA.norm(BC*BD))<=0 and m.sin(LA.norm(DA*DB))*m.sin(LA.norm(CA*CB))<=0):
+            #if(m.sin(LA.norm(AC*AD))*m.sin(LA.norm(BC*BD))<=0 and m.sin(LA.norm(DA*DB))*m.sin(LA.norm(CA*CB))<=0):
+            if np.dot(AC,AD)*np.dot(BC,BD)<=0 and np.dot(DA,DB)*np.dot(CA,CB)<=0:
                 return True
             else:
                 return False
@@ -165,6 +166,8 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
     def visualise(self):
         x = [h.pos.x for h in self.helio_dict.values()]
         y = [h.pos.y for h in self.helio_dict.values()]
+        ids = self.helio_dict.keys()
+        #subtree = [h.size_subtree for h in self.helio_dict.values()]
         #ax.plot([0,0],[0,800],c='g') plot cable
         for c in self.cable_dict.values():
             pos1 = self.helio_dict[c.h1].pos
@@ -174,8 +177,8 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
             plt.plot(x_list, y_list,c='g')
         plt.scatter(x,y,s=20 ,c='b')
 
-        for xy in zip(x,y):
-            plt.annotate('(%s, %s)' %xy, xy=xy)
+        for x,y,id in zip(x,y,ids):
+            plt.annotate('%s' %id, xy=[x,y])
         plt.scatter([0], [0], [50], c='r')
         plt.show()
         pass
@@ -298,6 +301,12 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
             self.helio_dict[self.helio_dict[h].parent] = -1
             return True
 
+    def root_tracer(self, h:HELIO_ID):
+        cur_h = h
+        while (self.helio_dict[cur_h].parent!= self.center_id and self.helio_dict[cur_h].parent != -1):
+            cur_h = self.helio_dict[cur_h].parent
+        return cur_h
+
     def is_different_subtree(self, h1: HELIO_ID, h2: HELIO_ID)-> bool:
         # get the root of the subtrees and compare
         cur_h = h1
@@ -358,7 +367,7 @@ def EW_algo():
     #algo
     have_change = True
     epoch = 0
-    while have_change and epoch<=50:
+    while have_change:
         have_change = False
         t_max= 0
         k = -1
@@ -379,7 +388,7 @@ def EW_algo():
             j = find_cloest(i)
             g_i = helio.distance(i,helio.center_id)
             c_ij = helio.distance(i,j)
-            if g_i - c_ij > t_max and ((helio.helio_dict[i].size_subtree + helio.helio_dict[j].size_subtree<= MAX_LENGTH)):
+            if g_i - c_ij > t_max and ((helio.helio_dict[helio.root_tracer(i)].size_subtree + helio.helio_dict[helio.root_tracer(j)].size_subtree<= MAX_LENGTH)) and len(helio.is_overlap_c(CABLE(j,i)))==0:
                 t_max = g_i - c_ij
                 k = i
                 k_j = j
@@ -391,6 +400,7 @@ def EW_algo():
         epoch +=1
         print("finish epoch {}".format(str(epoch)))
     helio.visualise()
+    #helio.save_solution("solution_620.pickle")
 
 EW_algo()
 

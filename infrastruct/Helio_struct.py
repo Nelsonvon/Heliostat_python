@@ -4,6 +4,7 @@ import numpy as np
 import numpy.linalg as LA
 import matplotlib.pyplot as plt
 import pickle
+import datetime
 
 CABLE_ID = int
 HELIO_ID = int
@@ -11,6 +12,7 @@ MAX_BRANCH = 16
 MAX_LENGTH = 128
 
 filename = 'positions-PS10.csv'
+
 
 class POS:
     x:float
@@ -75,34 +77,72 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
             return False
 
     def is_overlap_c2c(self, c1:CABLE, c2:CABLE)->bool:
-        A:POS = self.helio_dict[c1.h1].pos
-        B:POS = self.helio_dict[c1.h2].pos
-        C:POS = self.helio_dict[c2.h1].pos
-        D:POS = self.helio_dict[c2.h2].pos
-        def vec(p1:POS,p2:POS):
-            return np.array([p2.x-p1.x, p2.y-p1.y])
-        AC = vec(A,C)
-        AD = vec(A,D)
-        BC = vec(B,C)
-        BD = vec(B,D)
-        DA = vec(D,A)
-        DB = vec(D,B)
-        CA = vec(C,A)
-        CB = vec(C,B)
-
         def equal(p1:POS, p2:POS)->bool:
             if p1.x == p2.x and p1.y == p2.y:
                 return True
             else:
                 return False
-        if equal(A,C) or equal(A,D) or equal(B,C) or equal(B,D):
+
+        A:POS = self.helio_dict[c1.h1].pos
+        B:POS = self.helio_dict[c1.h2].pos
+        C:POS = self.helio_dict[c2.h1].pos
+        D:POS = self.helio_dict[c2.h2].pos
+
+        if (equal(A,C) and equal(B,D)) or (equal(A,D) and equal(B,C)):
+            print("cable 1 = cable 2!")
+            return False
+        x1 = A.x
+        y1 = A.y
+        x2 = B.x
+        y2 = B.y
+        x3 = C.x
+        y3 = C.y
+        x4 = D.x
+        y4 = D.y
+        # print(x1,y1,x2,y2,x3,y3,x4,y4)
+
+        denom = (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4)
+        if denom == 0: # parallel
+            # print("case1")
             return False
         else:
-            #if(m.sin(LA.norm(AC*AD))*m.sin(LA.norm(BC*BD))<=0 and m.sin(LA.norm(DA*DB))*m.sin(LA.norm(CA*CB))<=0):
-            if np.dot(AC,AD)*np.dot(BC,BD)<=0 and np.dot(DA,DB)*np.dot(CA,CB)<=0:
+            x0 = ((x1-x2)*(y3*x4-x3*y4)-(x3-x4)*(y1*x2-x1*y2))/denom
+            y0 = ((y1-y2)*(y3*x4-x3*y4)-(y3-y4)*(y1*x2-x1*y2))/denom
+            # print(x0,y0)
+            if x1==x2:
+                if y0 < max(y1,y2) and y0 > min(y1,y2):
+                    # print("case2")
+                    return True
+                else:
+                    # print("case3")
+                    return False
+            elif x0 < max(x1,x2) and x0 > min(x1,x2):
+                # print("case4")
                 return True
             else:
+                # print("case5")
                 return False
+
+        # def vec(p1:POS,p2:POS):
+        #     return np.array([p2.x-p1.x, p2.y-p1.y])
+        # AC = vec(A,C)
+        # AD = vec(A,D)
+        # BC = vec(B,C)
+        # BD = vec(B,D)
+        # DA = vec(D,A)
+        # DB = vec(D,B)
+        # CA = vec(C,A)
+        # CB = vec(C,B)
+        #
+        #
+        # if equal(A,C) or equal(A,D) or equal(B,C) or equal(B,D):
+        #     return False
+        # else:
+        #     #if(m.sin(LA.norm(AC*AD))*m.sin(LA.norm(BC*BD))<=0 and m.sin(LA.norm(DA*DB))*m.sin(LA.norm(CA*CB))<=0):
+        #     if np.dot(AC,AD)*np.dot(BC,BD)<=0 and np.dot(DA,DB)*np.dot(CA,CB)<=0:
+        #         return True
+        #     else:
+        #         return False
 
     def is_overlap_c(self, c:CABLE)->List[CABLE_ID]:
         overlap_cable: List[CABLE_ID] = []
@@ -157,13 +197,15 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
 
     def save_solution(self, save_file: str):
         cables = []
-        for h1, h2 in self.cable_dict.values():
+        for c in self.cable_dict.keys():
+            h1 = self.cable_dict[c].h1
+            h2 = self.cable_dict[c].h2
             cables.append([h1, h2])
         with open(save_file, 'wb') as fout:
             pickle.dump(cables,fout,pickle.HIGHEST_PROTOCOL)
         return
 
-    def visualise(self):
+    def visualise(self, save_fig:bool= False):
         x = [h.pos.x for h in self.helio_dict.values()]
         y = [h.pos.y for h in self.helio_dict.values()]
         ids = self.helio_dict.keys()
@@ -174,12 +216,14 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
             pos2 = self.helio_dict[c.h2].pos
             x_list = [pos1.x, pos2.x]
             y_list = [pos1.y, pos2.y]
-            plt.plot(x_list, y_list,c='g')
-        plt.scatter(x,y,s=20 ,c='b')
+            plt.plot(x_list, y_list,linewidth = 0.5,c='g')
+        plt.scatter(x,y,s=3 ,c='b')
 
-        for x,y,id in zip(x,y,ids):
-            plt.annotate('%s' %id, xy=[x,y])
-        plt.scatter([0], [0], [50], c='r')
+        # for x,y,id in zip(x,y,ids):
+        #     plt.annotate('%s' %id, xy=[x,y])
+        plt.scatter([0], [0], [25], c='r')
+        if save_fig:
+            plt.savefig('{}.eps'.format(datetime.datetime.now()), format='eps', dpi=1000)
         plt.show()
         pass
 
@@ -362,7 +406,7 @@ def EW_algo():
         if i != helio.center_id:
             helio.connect_hs(helio.center_id, i)
             gates.append(i)
-    helio.visualise()
+    # helio.visualise()
 
     #algo
     have_change = True
@@ -399,11 +443,18 @@ def EW_algo():
             gates.remove(k)
         epoch +=1
         print("finish epoch {}".format(str(epoch)))
-    helio.visualise()
-    #helio.save_solution("solution_620.pickle")
+    helio.visualise(save_fig=True)
+    helio.save_solution("solution_620.pickle")
 
 EW_algo()
 
+# helio = Helio_struct()
+# helio.connect_hs(0,2)
+# helio.connect_hs(1,3)
+# helio.visualise()
+# print(helio.is_overlap())
+# helio.load_solution("solution_620.pickle")
+# helio.visualise()
 
 
 

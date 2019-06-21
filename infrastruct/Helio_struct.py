@@ -11,6 +11,13 @@ HELIO_ID = int
 MAX_BRANCH = 16
 MAX_LENGTH = 128
 
+OverBranchPunish = 500000
+OverLengthPunish = 500000
+OverlapPunish = 500000
+
+conductor_price = 100
+oct_switch_price = 800
+hex_switch_price = 1500
 filename = 'positions-PS10.csv'
 
 
@@ -44,17 +51,18 @@ class heliostat:
         return
 
 
-class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
+class Helio_struct:
     cable_dict: Dict[CABLE_ID, CABLE] = {}
     helio_dict: Dict[HELIO_ID, heliostat] = {}
     center_id:HELIO_ID
-    def __init__(self):
+    def __init__(self, cable_price:float=0):
+        self.cable_price = cable_price
         self.center_id = 0
         p0 = POS(0,0)
         h0 = heliostat(p0)
         self.helio_dict[0] = h0
         self.get_data()
-        print("structure initialize complete")
+        print("structure initialize complete\n")
         return
 
 
@@ -71,12 +79,21 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
 
     def is_st(self)->bool: # check whether it is a spanning tree
         num_nodes = len(self.helio_dict)
-        print("size_subtree:{}, nodes:{}".format(str(self.helio_dict[self.center_id].size_subtree),
-                                                 str(num_nodes)))
-        if(self.helio_dict[self.center_id].size_subtree == num_nodes) and (len(self.cable_dict) == num_nodes -1):
-            return True
-        else:
-            return False
+        rlt = True
+        sum_nodes = 1
+        for h_id in self.helio_dict:
+            h = self.helio_dict[h_id]
+            if h.parent == -1 and h_id != self.center_id:
+                rlt = False
+                print("non-connected subtree: {}".format(str(h_id)))
+            if h.parent == self.center_id:
+                sum_nodes += h.size_subtree
+        if sum_nodes != num_nodes:
+            rlt = False
+        if(len(self.cable_dict) != num_nodes -1):
+            rlt = False
+
+        return rlt
 
     def is_overlap_c2c(self, c1:CABLE, c2:CABLE)->bool:
         def equal(p1:POS, p2:POS)->bool:
@@ -169,7 +186,7 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
     def is_overdeg(self)->List[HELIO_ID]:
         node_list: List[HELIO_ID] = []
         for h_id in self.helio_dict:
-            if len(self.helio_dict[h_id].child)>MAX_BRANCH:
+            if len(self.helio_dict[h_id].child)>MAX_BRANCH and h_id != self.center_id:
                 node_list.append(h_id)
         return node_list
 
@@ -234,8 +251,6 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
             self.connect_hs(h1,h2)
         return
 
-    def cal_cost(self)->float:
-        pass
 
     def distance(self, h1:HELIO_ID,h2:HELIO_ID):
         a = self.helio_dict[h1].pos
@@ -364,6 +379,52 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
         else:
             return True
 
+    def get_cabel_length(self)->float:
+        sum_length = 0
+        for c_id in self.cable_dict:
+            h1 = self.cable_dict[c_id].h1
+            h2 = self.cable_dict[c_id].h2
+            p1 = self.helio_dict[h1].pos
+            p2 = self.helio_dict[h2].pos
+            length = m.sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2)
+            sum_length += length
+        return sum_length
+
+    def get_cost(self)->float:
+        def get_cost_iter(h:HELIO_ID)->float:
+            if self.helio_dict[h].size_subtree==1:
+                return 0
+            else:
+                child_size = len(self.helio_dict[h].child)
+                # TODO: So far no checking on the number of child
+                sum_subtree_size = 1
+                for h_child in self.helio_dict[h].child:
+                    sum_subtree_size += self.helio_dict[h_child].size_subtree
+                if sum_subtree_size != self.helio_dict[h].size_subtree:
+                    print("ERROR: Sum of size from children doesn't match subtree size")
+                # finished checking
+
+                # control unit cost
+                if  child_size == 1:
+                    sum_cost = conductor_price
+                elif child_size <= 8:
+                    sum_cost = oct_switch_price
+                elif child_size <= 16:
+                    sum_cost = hex_switch_price
+                else:
+                    print("Warnning: Heliostat {} over branching".format(str(h)))
+                    sum_cost = OverBranchPunish
+
+                for h_child in self.helio_dict[h].child:
+                    sum_cost += get_cost_iter(h_child)
+                    sum_cost += self.cable_price*self.distance(h_child,h)
+                return sum_cost
+        cost = 0
+        for gate in self.helio_dict[self.center_id].child:
+            cost += get_cost_iter(gate)
+            cost += self.cable_price * self.distance(gate, self.center_id)
+        return cost
+
 # helio = Helio_struct()
 # for i in helio.helio_dict:
 #     if i >0:
@@ -396,10 +457,10 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
 #                 # print("can't find suitable parent")
 #                 # print("h_id:{}, h_id parent:{}".format(str(h_id),str(helio.helio_dict[h_id].parent)))
 
-def EW_algo():
+def EW_algo(helio:Helio_struct):
     # connnect to the center
     gates: List= []
-    helio = Helio_struct()
+    # helio = Helio_struct()
     for i in helio.helio_dict.keys():
         if i != helio.center_id:
             helio.connect_hs(helio.center_id, i)
@@ -446,19 +507,46 @@ def EW_algo():
 
 # EW_algo()
 
-helio = Helio_struct()
-# helio.connect_hs(0,2)
-# helio.connect_hs(1,3)
+# helio = Helio_struct()
+# # helio.connect_hs(0,2)
+# # helio.connect_hs(1,3)
+# # helio.visualise()
+# # print(helio.is_overlap())
+# helio.load_solution("solution_620.pickle")
 # helio.visualise()
 # print(helio.is_overlap())
-helio.load_solution("solution_620.pickle")
-helio.visualise()
-print(helio.is_overlap())
-print(helio.is_st())
-print(helio.is_overlength())
-print(helio.is_overdeg())
+# print(helio.is_st())
+# print(helio.is_overlength())
+# print(helio.is_overdeg())
 
+load_model = True
+sol_file:str = "/home/nelson/PycharmProjects/Heliostat/infrastruct/2019-06-21 12:10:19.581719.pickle"
+"""
+Structure Definition
+"""
+helio = Helio_struct(cable_price=54)
 
+"""
+Initialization / loading
+"""
+if load_model == True:
+    helio.load_solution(load_file=sol_file)
+else:
+    EW_algo(helio)
+
+"""
+Feasibility Checking
+"""
+# print(helio.is_overdeg())
+# print(helio.is_overlength())
+# print(helio.is_overlap())
+# print(helio.is_st())
+print("Solution is feasible: {}".format(str(helio.is_feasible())))
+"""
+Solution evaluation
+"""
+print(helio.get_cabel_length())
+print(helio.get_cost())
 
 
 

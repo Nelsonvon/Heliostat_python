@@ -71,6 +71,8 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
 
     def is_st(self)->bool: # check whether it is a spanning tree
         num_nodes = len(self.helio_dict)
+        print("size_subtree:{}, nodes:{}".format(str(self.helio_dict[self.center_id].size_subtree),
+                                                 str(num_nodes)))
         if(self.helio_dict[self.center_id].size_subtree == num_nodes) and (len(self.cable_dict) == num_nodes -1):
             return True
         else:
@@ -91,6 +93,8 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
         if (equal(A,C) and equal(B,D)) or (equal(A,D) and equal(B,C)):
             print("cable 1 = cable 2!")
             return False
+        if equal(A, C) or equal(A, D) or equal(B, C) or equal(B, D):
+            return False
         x1 = A.x
         y1 = A.y
         x2 = B.x
@@ -100,28 +104,22 @@ class Helio_struct: # TODO: 将中心点排除在所有点遍历之外
         x4 = D.x
         y4 = D.y
         # print(x1,y1,x2,y2,x3,y3,x4,y4)
-
+        def lineIntersectside(A,B,C,D):
+            fc = (C.y-A.y)*(A.x-B.x)-(C.x-A.x)*(A.y-B.y)
+            fd = (D.y-A.y)*(A.x-B.x)-(D.x-A.x)*(A.y-B.y)
+            if fc*fd >0:
+                return False
+            else:
+                return True
         denom = (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4)
         if denom == 0: # parallel
             # print("case1")
             return False
         else:
-            x0 = ((x1-x2)*(y3*x4-x3*y4)-(x3-x4)*(y1*x2-x1*y2))/denom
-            y0 = ((y1-y2)*(y3*x4-x3*y4)-(y3-y4)*(y1*x2-x1*y2))/denom
-            # print(x0,y0)
-            if x1==x2:
-                if y0 < max(y1,y2) and y0 > min(y1,y2):
-                    # print("case2")
-                    return True
-                else:
-                    # print("case3")
-                    return False
-            elif x0 < max(x1,x2) and x0 > min(x1,x2):
-                # print("case4")
-                return True
-            else:
-                # print("case5")
-                return False
+           if (not lineIntersectside(A,B,C,D)) or (not lineIntersectside(C,D,A,B)):
+               return False
+           else:
+               return True
 
         # def vec(p1:POS,p2:POS):
         #     return np.array([p2.x-p1.x, p2.y-p1.y])
@@ -444,17 +442,21 @@ def EW_algo():
         epoch +=1
         print("finish epoch {}".format(str(epoch)))
     helio.visualise(save_fig=True)
-    helio.save_solution("solution_620.pickle")
+    helio.save_solution("{}.pickle".format(datetime.datetime.now()))
 
-EW_algo()
+# EW_algo()
 
-# helio = Helio_struct()
+helio = Helio_struct()
 # helio.connect_hs(0,2)
 # helio.connect_hs(1,3)
 # helio.visualise()
 # print(helio.is_overlap())
-# helio.load_solution("solution_620.pickle")
-# helio.visualise()
+helio.load_solution("solution_620.pickle")
+helio.visualise()
+print(helio.is_overlap())
+print(helio.is_st())
+print(helio.is_overlength())
+print(helio.is_overdeg())
 
 
 

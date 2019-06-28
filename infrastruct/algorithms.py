@@ -195,7 +195,7 @@ def EW_algo3(helio:Helio_struct, max_epoch = 1000):
 # TODO: Randomized local search disconnect-reconnect
 # TODO: Disconnect-Reconnect with simulated annealing
 def dis_reconnnect(helio:Helio_struct, max_epoch:int=1000):
-    # TODO: discard simulated annealing parameters
+    # TO*DO: discard simulated annealing parameters
     # alpha = 0.8
     # t_max = 200000 # approximation of Delta_C_max
     # t_min = 1
@@ -206,7 +206,7 @@ def dis_reconnnect(helio:Helio_struct, max_epoch:int=1000):
     epoch = 0
     epoch_no_improve = 0
     terminate = False
-    while epoch<max_epoch and not terminate: # TODO: change terminate condition
+    while epoch<max_epoch and not terminate: # TO*DO: change terminate condition
         # select disconnect point randomly
         disconnect_point = random.choice(list(helio.helio_dict.keys()))
         while disconnect_point == helio.center_id:
@@ -230,6 +230,12 @@ def dis_reconnnect(helio:Helio_struct, max_epoch:int=1000):
         def get_reconnect_cost(root:HELIO_ID, reconnect_point:HELIO_ID)->(float,HELIO_ID): # TO*DO: cost of neighbours
             min_cost = 10000
             reconnect_parent = -1
+            reconnect_control_cost = 0
+            num_child_reconnect = len(helio.helio_dict[reconnect_point].child)+1
+            if num_child_reconnect ==2:
+                reconnect_control_cost = 700 # reconnection: from conductor to 8-port
+            if num_child_reconnect == 9:
+                reconnect_control_cost = 700 # from 8-port to 16-port
             for h in helio.helio_dict:
                 is_feasible = False
                 if helio.distance(reconnect_point,h)*helio.cable_price<min_cost:  # possible better solution
@@ -257,24 +263,31 @@ def dis_reconnnect(helio:Helio_struct, max_epoch:int=1000):
                     if curr_cost < min_cost:
                         min_cost = curr_cost
                         reconnect_parent = h
-            return min_cost, reconnect_parent
+            return min_cost+reconnect_control_cost, reconnect_parent
 
         for candidate in candidate_list:
-            cost,new_parent = get_reconnect_cost(disconnect_point,candidate)
-            if (candidate != disconnect_point or new_parent != parent) and new_parent != -1:
-                candidate_cost[candidate] = [cost,new_parent]
+            if len(helio.helio_dict[candidate].child)<16:
+                cost,new_parent = get_reconnect_cost(disconnect_point,candidate)
+                if (candidate != disconnect_point or new_parent != parent) and new_parent != -1:
+                    candidate_cost[candidate] = [cost,new_parent]
 
 
         # TO*DO: restrict the candidates list and randomly select solution
         alpha = 0.2 # restrict coefficient of GRASP
         if len(candidate_cost)>0:
             minus_dist = helio.distance(disconnect_point, parent)
-            minus_control = 0
+            minus_control_parent = 0
             if len(helio.helio_dict[parent].child) == 1:
-                minus_control = 700  # from 8-port to conductor
+                minus_control_parent = 700  # from 8-port to conductor
             if len(helio.helio_dict[parent].child) == 8:
-                minus_control = 700  # from 16-port to 8-port
-            minus_cost = minus_control + minus_dist*helio.cable_price
+                minus_control_parent = 700  # from 16-port to 8-port
+            # TODO: Fix the computation of cost change
+            minus_control_stroot = 0
+            if len(helio.helio_dict[disconnect_point].child)==2:
+                minus_control_stroot = 700 # root from 8-port to 16-port
+            if len(helio.helio_dict[disconnect_point].child) == 9:
+                minus_control_stroot = 700
+            minus_cost = minus_control_parent + minus_dist*helio.cable_price + minus_control_stroot
 
             c_min = min([l[0] for l in candidate_cost.values()])
             c_max = max([l[0] for l in candidate_cost.values()])
@@ -302,17 +315,19 @@ def dis_reconnnect(helio:Helio_struct, max_epoch:int=1000):
             helio.connect_hs(parent,disconnect_point)
             # print("epoch {} has no feasible solution".format(str(epoch)))
 
-        # TODO: update parameter
+        # TO9DO: update parameter
         if epoch_no_improve == 100:
             terminate = True
 
-        if epoch_no_improve==0 or epoch % 40 == 0:
+        if epoch % 40 == 0:
             helio.visualise()
             print("finish epoch {}".format(str(epoch)))
             print("\tLength: {} m".format(str(helio.get_cabel_length())))
             print("\tCost: {}".format(str(helio.get_cost())))
         # print("is feasible: {}".format(str(helio.is_feasible())))
         epoch += 1
+    helio.save_solution("{}.pickle".format(datetime.datetime.now()))
+    helio.visualise(save_fig=True)
 
 
 

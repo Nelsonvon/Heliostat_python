@@ -41,7 +41,7 @@ class Helio_struct:
         self.center_id = 0
         p0 = POS(0,0)
         h0 = heliostat(p0)
-        self.helio_dict[0] = h0
+        self.helio_dict[self.center_id] = h0
         self.get_data()
         print("structure initialize complete\n")
         return
@@ -202,6 +202,9 @@ class Helio_struct:
         return
 
     def visualise(self, save_fig:bool= False):
+        for h in self.helio_dict.values():
+            if isinstance(h, int):
+                print(h)
         x = [h.pos.x for h in self.helio_dict.values()]
         y = [h.pos.y for h in self.helio_dict.values()]
         ids = self.helio_dict.keys()
@@ -279,11 +282,11 @@ class Helio_struct:
             cur_helio = self.helio_dict[cur_helio].parent
         self.helio_dict[child_id].parent = -1
 
-        del_id = 0
+        del_id = -1
         for cable_id in self.cable_dict:
             if(self.cable_dict[cable_id].h1==a and self.cable_dict[cable_id].h2 ==b) or (self.cable_dict[cable_id].h2==a and self.cable_dict[cable_id].h1==b):
                 del_id = cable_id
-        if del_id:
+        if del_id != -1:
             del self.cable_dict[del_id]
 
         return True
@@ -325,9 +328,11 @@ class Helio_struct:
         self.convert_root(self.helio_dict[h].parent)
         cap_parent = self.helio_dict[self.helio_dict[h].parent].size_subtree
         cap_child = self.helio_dict[h].size_subtree
-        self.helio_dict[self.helio_dict[h].parent].size_subtree = cap_parent - cap_child
-        self.helio_dict[self.helio_dict[h].parent].child.remove(h)
-        self.helio_dict[self.helio_dict[h].parent].parent = h
+        parent = self.helio_dict[h].parent
+        self.helio_dict[parent].size_subtree = cap_parent - cap_child
+        self.helio_dict[parent].child.remove(h)
+        self.helio_dict[parent].parent = h
+        self.helio_dict[h].child.append(parent)
         self.helio_dict[h].size_subtree = cap_parent
         pass
 
@@ -336,7 +341,7 @@ class Helio_struct:
             return False
         else:
             self.convert_root(h)
-            self.helio_dict[self.helio_dict[h].parent] = -1
+            self.helio_dict[h].parent = -1
             return True
 
     def root_tracer(self, h:HELIO_ID):
@@ -374,7 +379,7 @@ class Helio_struct:
     def get_cost(self)->float:
         def get_cost_iter(h:HELIO_ID)->float:
             if self.helio_dict[h].size_subtree==1:
-                return 0
+                return conductor_price
             else:
                 child_size = len(self.helio_dict[h].child)
                 # TODO: So far no checking on the number of child
@@ -382,11 +387,12 @@ class Helio_struct:
                 for h_child in self.helio_dict[h].child:
                     sum_subtree_size += self.helio_dict[h_child].size_subtree
                 if sum_subtree_size != self.helio_dict[h].size_subtree:
-                    print("ERROR: Sum of size from children doesn't match subtree size")
+                    print("ERROR: Sum of size from children doesn't match subtree size, h={}"
+                          "Sum = {}, subtree_size={}".format(str(h),str(sum_subtree_size),str(self.helio_dict[h].size_subtree)))
                 # finished checking
 
                 # control unit cost
-                if  child_size == 1:
+                if  child_size <= 1:
                     sum_cost = conductor_price
                 elif child_size <= 8:
                     sum_cost = oct_switch_price

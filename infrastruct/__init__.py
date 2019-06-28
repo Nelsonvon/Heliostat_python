@@ -5,6 +5,7 @@ import numpy.linalg as LA
 import matplotlib.pyplot as plt
 import pickle
 import datetime
+import random
 
 
 

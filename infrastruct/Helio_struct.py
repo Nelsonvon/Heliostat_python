@@ -215,8 +215,8 @@ class Helio_struct:
             pos2 = self.helio_dict[c.h2].pos
             x_list = [pos1.x, pos2.x]
             y_list = [pos1.y, pos2.y]
-            plt.plot(x_list, y_list,linewidth = 0.5,c='g')
-        plt.scatter(x,y,s=3 ,c='b')
+            plt.plot(x_list, y_list,linewidth = 0.1,c='g')
+        plt.scatter(x,y,s=1 ,c='b')
 
         # for x,y,id in zip(x,y,ids):
         #     plt.annotate('%s' %id, xy=[x,y])

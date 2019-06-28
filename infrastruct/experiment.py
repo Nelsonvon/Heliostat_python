@@ -6,6 +6,7 @@ pickle_EW2_54 = "/home/nelson/PycharmProjects/Heliostat/infrastruct/2019-06-21 2
 pickle_EW2_29 = "/home/nelson/PycharmProjects/Heliostat/infrastruct/worthy_rlt/06-21 EW_algo2 CableCost29.pickle"
 pickle_EW2_14 = "/home/nelson/PycharmProjects/Heliostat/infrastruct/worthy_rlt/06-21 EW_algo2 CableCost14.pickle"
 pickle_EW3_29 = "/home/nelson/PycharmProjects/Heliostat/infrastruct/worthy_rlt/2019-06-27 22:42:34.480114.pickle"
+pickle_DR_29 = "/home/nelson/PycharmProjects/Heliostat/infrastruct/2019-06-28 21:06:11.269027.pickle"
 
 load_model = True
 sol_file = ""
@@ -42,9 +43,9 @@ helio = Helio_struct(cable_price=29)
 # print("Length: {} m".format(str(helio2.get_cabel_length())))
 # print("Cost: {}".format(str(helio2.get_cost())))
 
-helio.load_solution(load_file=pickle_EW3_29)
-dis_reconnnect(helio,max_epoch=2000)
-
+helio.load_solution(load_file=pickle_DR_29)
+# dis_reconnnect(helio,max_epoch=2000)
+# helio.visualise(save_fig=True)
 
 print("Solution is feasible: {}".format(str(helio.is_feasible())))
 print("Length: {} m".format(str(helio.get_cabel_length())))
